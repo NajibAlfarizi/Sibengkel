@@ -1,0 +1,184 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Master Data - Kategori Produk
+model Category {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
+}
+
+// Master Data - Produk
+model Product {
+  id              String            @id @default(cuid())
+  code            String            @unique
+  name            String
+  description     String?
+  categoryId      String
+  category        Category          @relation(fields: [categoryId], references: [id])
+  stock           Int               @default(0)
+  purchasePrice   Float
+  sellingPrice    Float
+  minStock        Int               @default(5)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  transactionItems TransactionItem[]
+}
+
+// Master Data - Customer
+model Customer {
+  id              String        @id @default(cuid())
+  code            String        @unique
+  name            String
+  type            String        // UMUM or PERUSAHAAN
+  companyName     String?
+  phone           String?
+  email           String?
+  address         String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  transactions    Transaction[]
+}
+
+// Master Data - Supplier
+model Supplier {
+  id           String        @id @default(cuid())
+  code         String        @unique
+  name         String
+  companyName  String?
+  phone        String?
+  email        String?
+  address      String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  transactions Transaction[]
+}
+
+// Transaksi Penjualan/Pembelian
+model Transaction {
+  id              String              @id @default(cuid())
+  invoiceNumber   String              @unique
+  type            String              // PENJUALAN or PEMBELIAN
+  date            DateTime            @default(now())
+  customerId      String?
+  customer        Customer?           @relation(fields: [customerId], references: [id])
+  supplierId      String?
+  supplier        Supplier?           @relation(fields: [supplierId], references: [id])
+  subtotal        Float
+  discount        Float               @default(0)
+  tax             Float               @default(0)
+  total           Float
+  paymentMethod   String              // CASH or CREDIT
+  paymentStatus   String              // LUNAS, BELUM_LUNAS, or CICILAN
+  paidAmount      Float               @default(0)
+  remainingAmount Float               @default(0)
+  status          String              @default("PENDING") // PENDING, COMPLETED, or CANCELLED
+  notes           String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  items           TransactionItem[]
+  payments        Payment[]
+}
+
+// Detail Item Transaksi
+model TransactionItem {
+  id            String      @id @default(cuid())
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  productId     String
+  product       Product     @relation(fields: [productId], references: [id])
+  quantity      Int
+  price         Float
+  discount      Float       @default(0)
+  subtotal      Float
+  createdAt     DateTime    @default(now())
+}
+
+// Pembayaran (untuk cicilan)
+model Payment {
+  id            String      @id @default(cuid())
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  amount        Float
+  paymentDate   DateTime    @default(now())
+  paymentMethod String      // CASH or CREDIT
+  notes         String?
+  createdAt     DateTime    @default(now())
+}
+
+// Piutang (untuk customer)
+model Receivable {
+  id            String               @id @default(cuid())
+  customerId    String?
+  customer      String?              // Store as string
+  amount        Float
+  paidAmount    Float                @default(0)
+  remaining     Float
+  dueDate       DateTime?
+  status        String               // LUNAS, BELUM_LUNAS
+  description   String?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  payments      ReceivablePayment[]
+}
+
+model ReceivablePayment {
+  id            String     @id @default(cuid())
+  receivableId  String
+  receivable    Receivable @relation(fields: [receivableId], references: [id], onDelete: Cascade)
+  amount        Float
+  paymentMethod String     // CASH, TRANSFER, CARD
+  notes         String?
+  date          DateTime   @default(now())
+  createdAt     DateTime   @default(now())
+}
+
+// Hutang (untuk supplier)
+model Payable {
+  id            String          @id @default(cuid())
+  supplierId    String?
+  supplier      String?         // Store as string
+  amount        Float
+  paidAmount    Float           @default(0)
+  remaining     Float
+  dueDate       DateTime?
+  status        String          // LUNAS, BELUM_LUNAS
+  description   String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  payments      PayablePayment[]
+}
+
+model PayablePayment {
+  id            String   @id @default(cuid())
+  payableId     String
+  payable       Payable  @relation(fields: [payableId], references: [id], onDelete: Cascade)
+  amount        Float
+  paymentMethod String   // CASH, TRANSFER, CARD
+  notes         String?
+  date          DateTime @default(now())
+  createdAt     DateTime @default(now())
+}
+
+// Pengeluaran
+model Expense {
+  id          String   @id @default(cuid())
+  date        DateTime @default(now())
+  category    String
+  amount      Float
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
